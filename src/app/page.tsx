@@ -11,6 +11,7 @@ import {
   advanceTask,
   clearDone,
   clearDueDate,
+  compareTasks,
   createTask,
   deleteTask,
   dueDateLabel,
@@ -156,6 +157,7 @@ export default function Home() {
               <ul className="flex flex-col gap-2">
                 {tasks
                   .filter((task) => task.status === status)
+                  .sort(compareTasks)
                   .map((task) => (
                     <li
                       key={task.id}

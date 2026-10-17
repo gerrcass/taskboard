@@ -78,6 +78,36 @@ export function taskPriority(task: Task): TaskPriority {
   return task.priority ?? DEFAULT_PRIORITY;
 }
 
+const PRIORITY_ORDER: Record<TaskPriority, number> = {
+  high: 0,
+  normal: 1,
+  low: 2,
+};
+
+// Orders tasks within a column: priority first, then the nearest due date, then
+// oldest first. Tasks without a due date sort after dated ones in the same
+// priority, and `id` breaks any remaining ties so the order never depends on
+// where a task happened to sit in the stored array.
+export function compareTasks(a: Task, b: Task): number {
+  const byPriority =
+    PRIORITY_ORDER[taskPriority(a)] - PRIORITY_ORDER[taskPriority(b)];
+  if (byPriority !== 0) {
+    return byPriority;
+  }
+
+  if (a.dueDate !== b.dueDate) {
+    if (a.dueDate === undefined) return 1;
+    if (b.dueDate === undefined) return -1;
+    return a.dueDate < b.dueDate ? -1 : 1;
+  }
+
+  if (a.createdAt !== b.createdAt) {
+    return a.createdAt - b.createdAt;
+  }
+
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
 const MONTHS = [
   "Jan",
   "Feb",
