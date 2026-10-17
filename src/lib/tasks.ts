@@ -266,22 +266,48 @@ export function deleteTask(tasks: readonly Task[], id: string): Task[] {
   return tasks.filter((t) => t.id !== id);
 }
 
-// Puts a task that was deleted back on the board. The caller holds the whole
-// task, so every field — title, status, priority, due date and creation time —
-// comes back exactly as it was. Where it lands does not matter: the columns
+// Puts tasks that were deleted back on the board. The caller holds the whole
+// tasks, so every field — title, status, priority, due date and creation time —
+// comes back exactly as it was. Where they land does not matter: the columns
 // sort with `compareTasks`, so a restored task returns to its usual place.
-export function restoreTask(tasks: readonly Task[], task: Task): Task[] {
-  if (tasks.some((t) => t.id === task.id)) {
+export function restoreTasks(
+  tasks: readonly Task[],
+  restored: readonly Task[],
+): Task[] {
+  const existing = new Set(tasks.map((t) => t.id));
+  const additions = restored.filter((t) => !existing.has(t.id));
+  if (additions.length === 0) {
     return tasks as Task[];
   }
-  return [...tasks, task];
+  return [...tasks, ...additions];
 }
 
-export function clearDone(tasks: readonly Task[]): Task[] {
-  if (!tasks.some((t) => t.status === "done")) {
+export function restoreTask(tasks: readonly Task[], task: Task): Task[] {
+  return restoreTasks(tasks, [task]);
+}
+
+// The done tasks the active filters leave visible on the board. `clearDone`
+// only ever deletes these, so done work the user cannot see is never cleared.
+export function visibleDoneTasks(
+  tasks: readonly Task[],
+  filters: TaskFilters = DEFAULT_FILTERS,
+  now: number = Date.now(),
+): Task[] {
+  return filterTasks(tasks, filters, now).filter((t) => t.status === "done");
+}
+
+export function clearDone(
+  tasks: readonly Task[],
+  filters: TaskFilters = DEFAULT_FILTERS,
+  now: number = Date.now(),
+): Task[] {
+  const cleared = new Set(
+    visibleDoneTasks(tasks, filters, now).map((t) => t.id),
+  );
+  if (cleared.size === 0) {
     return tasks as Task[];
   }
-  return tasks.filter((t) => t.status !== "done");
+  return tasks.filter((t) => !cleared.has(t.id));
 }
 
 export function taskCounts(tasks: readonly Task[]): Record<TaskStatus, number> {

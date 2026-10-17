@@ -22,12 +22,13 @@ import {
   isOverdue,
   overdueCount,
   renameTask,
-  restoreTask,
+  restoreTasks,
   retreatTask,
   setDueDate,
   taskCounts,
   taskPriority,
   taskSummary,
+  visibleDoneTasks,
   type Task,
   type TaskFilters,
   type TaskPriority,
@@ -47,12 +48,12 @@ export default function Home() {
   const [priority, setPriority] = useState<TaskPriority>(DEFAULT_PRIORITY);
   const [newDueDate, setNewDueDate] = useState("");
   const [filters, setFilters] = useState<TaskFilters>(DEFAULT_FILTERS);
-  const [undoable, setUndoable] = useState<Task | null>(null);
+  const [undoable, setUndoable] = useState<PendingUndo | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const undoButtonRef = useRef<HTMLButtonElement>(null);
 
-  // A deletion moves focus onto the Undo button, so a keyboard user can undo it
-  // without tabbing back from the top of the page.
+  // A destructive action moves focus onto the Undo button, so a keyboard user
+  // can undo it without tabbing back from the top of the page.
   useEffect(() => {
     if (undoable) undoButtonRef.current?.focus();
   }, [undoable]);
@@ -92,11 +93,10 @@ export default function Home() {
     setNewDueDate("");
   };
 
-  // Deleting arms a single undo. A second deletion replaces the notice, so only
-  // the most recent deletion can be brought back.
-  const deleteTaskWithUndo = (task: Task) => {
-    updateTasks(deleteTask(tasks, task.id));
-    setUndoable(task);
+  // A destructive action arms one undo notice. A later action replaces it, so
+  // only the most recent deletion or clear can be brought back.
+  const armUndo = (pending: PendingUndo) => {
+    setUndoable(pending);
     if (undoTimer.current) clearTimeout(undoTimer.current);
     undoTimer.current = setTimeout(() => {
       undoTimer.current = null;
@@ -104,9 +104,34 @@ export default function Home() {
     }, UNDO_TIMEOUT_MS);
   };
 
-  const undoDelete = () => {
+  const deleteTaskWithUndo = (task: Task) => {
+    updateTasks(deleteTask(tasks, task.id));
+    armUndo({
+      tasks: [task],
+      message: "Task deleted",
+      label: `Undo delete of "${task.title}"`,
+    });
+  };
+
+  // Clearing holds every task it removed so one click puts them all back. The
+  // button is disabled whenever a filter hides done work, so the count is what
+  // the user can see.
+  const clearDoneWithUndo = () => {
+    const cleared = visibleDoneTasks(tasks, filters);
+    if (cleared.length === 0) return;
+    updateTasks(clearDone(tasks, filters));
+    const count =
+      cleared.length === 1 ? "1 done task" : `${cleared.length} done tasks`;
+    armUndo({
+      tasks: cleared,
+      message: `Cleared ${count}`,
+      label: `Undo clearing ${count}`,
+    });
+  };
+
+  const undoLastAction = () => {
     if (!undoable) return;
-    updateTasks(restoreTask(tasks, undoable));
+    updateTasks(restoreTasks(tasks, undoable.tasks));
     if (undoTimer.current) clearTimeout(undoTimer.current);
     undoTimer.current = null;
     setUndoable(null);
@@ -195,7 +220,7 @@ export default function Home() {
           </form>
           <button
             type="button"
-            onClick={() => updateTasks(clearDone(tasks))}
+            onClick={clearDoneWithUndo}
             disabled={clearDoneDisabled}
             title={clearDoneTitle}
             className="h-11 shrink-0 rounded-lg border border-zinc-300 px-4 font-medium whitespace-nowrap text-zinc-700 transition-colors hover:bg-zinc-200 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
@@ -353,12 +378,12 @@ export default function Home() {
         >
           {undoable && (
             <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-zinc-200 bg-white py-1.5 pr-1.5 pl-4 text-sm text-zinc-700 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-              <span>Task deleted</span>
+              <span>{undoable.message}</span>
               <button
                 ref={undoButtonRef}
                 type="button"
-                onClick={undoDelete}
-                aria-label={`Undo delete of "${undoable.title}"`}
+                onClick={undoLastAction}
+                aria-label={undoable.label}
                 className="rounded-full bg-zinc-900 px-3 py-1 font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
               >
                 Undo
@@ -372,6 +397,14 @@ export default function Home() {
 }
 
 const UNDO_TIMEOUT_MS = 10_000;
+
+// A destructive action waiting to be undone: the tasks to put back and the
+// notice shown for it.
+type PendingUndo = {
+  tasks: Task[];
+  message: string;
+  label: string;
+};
 
 const STATUS_FILTER_OPTIONS: readonly {
   value: TaskStatusFilter;
