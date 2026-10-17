@@ -6,6 +6,7 @@ import {
   moveTask,
   retreatTask,
   taskCounts,
+  taskSummary,
   type Task,
 } from "./tasks";
 
@@ -86,5 +87,20 @@ describe("taskCounts", () => {
   it("counts tasks per column", () => {
     const tasks = [task("a"), task("b", "doing"), task("c", "done"), task("d", "done")];
     expect(taskCounts(tasks)).toEqual({ todo: 1, doing: 1, done: 2 });
+  });
+});
+
+describe("taskSummary", () => {
+  it("summarises the total and how many are done", () => {
+    const tasks = [task("a"), task("b", "doing"), task("c", "done"), task("d", "done")];
+    expect(taskSummary(tasks)).toBe("4 tasks · 2 done");
+  });
+
+  it("uses the singular for a single task", () => {
+    expect(taskSummary([task("a")])).toBe("1 task · 0 done");
+  });
+
+  it("shows a friendly message when the board is empty", () => {
+    expect(taskSummary([])).toBe("No tasks yet — add one to get started");
   });
 });

@@ -9,6 +9,7 @@ import {
   deleteTask,
   retreatTask,
   taskCounts,
+  taskSummary,
 } from "@/lib/tasks";
 import {
   getServerSnapshot,
@@ -41,6 +42,9 @@ export default function Home() {
           <p className="text-zinc-600 dark:text-zinc-400">
             A small task board. Add a task, move it across the columns, and it is
             kept in your browser.
+          </p>
+          <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+            {taskSummary(tasks)}
           </p>
         </header>
 
