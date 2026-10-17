@@ -74,6 +74,13 @@ export function deleteTask(tasks: readonly Task[], id: string): Task[] {
   return tasks.filter((t) => t.id !== id);
 }
 
+export function clearDone(tasks: readonly Task[]): Task[] {
+  if (!tasks.some((t) => t.status === "done")) {
+    return tasks as Task[];
+  }
+  return tasks.filter((t) => t.status !== "done");
+}
+
 export function taskCounts(tasks: readonly Task[]): Record<TaskStatus, number> {
   const counts: Record<TaskStatus, number> = { todo: 0, doing: 0, done: 0 };
   for (const task of tasks) {

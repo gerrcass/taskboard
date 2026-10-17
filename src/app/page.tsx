@@ -5,6 +5,7 @@ import {
   STATUS_LABELS,
   TASK_STATUSES,
   advanceTask,
+  clearDone,
   createTask,
   deleteTask,
   retreatTask,
@@ -48,22 +49,32 @@ export default function Home() {
           </p>
         </header>
 
-        <form onSubmit={addTask} className="flex w-full max-w-xl gap-3">
-          <input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder="What needs doing?"
-            aria-label="New task title"
-            className="h-11 flex-1 rounded-lg border border-zinc-300 bg-white px-4 text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400"
-          />
+        <div className="flex w-full max-w-xl items-center gap-3">
+          <form onSubmit={addTask} className="flex flex-1 gap-3">
+            <input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="What needs doing?"
+              aria-label="New task title"
+              className="h-11 flex-1 rounded-lg border border-zinc-300 bg-white px-4 text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400"
+            />
+            <button
+              type="submit"
+              className="h-11 rounded-lg bg-zinc-900 px-5 font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              disabled={!title.trim()}
+            >
+              Add task
+            </button>
+          </form>
           <button
-            type="submit"
-            className="h-11 rounded-lg bg-zinc-900 px-5 font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
-            disabled={!title.trim()}
+            type="button"
+            onClick={() => updateTasks(clearDone(tasks))}
+            disabled={counts.done === 0}
+            className="h-11 rounded-lg border border-zinc-300 px-4 font-medium text-zinc-700 transition-colors hover:bg-zinc-200 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
           >
-            Add task
+            Clear done
           </button>
-        </form>
+        </div>
 
         <section className="grid flex-1 grid-cols-1 gap-6 md:grid-cols-3">
           {TASK_STATUSES.map((status) => (
