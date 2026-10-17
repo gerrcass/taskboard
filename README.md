@@ -1,12 +1,13 @@
 # Taskboard
 
 A small task board: add tasks, move them across **To do → Doing → Done**, set
-priorities, rename them inline, and export the board as JSON. Everything is
-kept in the browser's localStorage, so there is no backend to run.
+priorities and due dates, filter and order what you see, rename them inline,
+and export the board as JSON. Everything is kept in the browser's
+localStorage, so there is no backend to run.
 
 **[Open the live board →](https://gerrcass.github.io/taskboard/)**
 
-![The task board: tasks across the To do, Doing and Done columns](docs/screenshot.png)
+![The task board: filter bar, priority badges, due dates and an overdue callout](docs/screenshot.png)
 
 This repository is the demo app for the
 [software-factory](https://github.com/gerrcass/software-factory) pipeline:
