@@ -17,11 +17,13 @@ import {
   overdueCount,
   renameTask,
   restoreTask,
+  restoreTasks,
   retreatTask,
   setDueDate,
   taskCounts,
   taskPriority,
   taskSummary,
+  visibleDoneTasks,
   type Task,
   type TaskFilters,
 } from "./tasks";
@@ -552,7 +554,91 @@ describe("restoreTask", () => {
   });
 });
 
+describe("restoreTasks", () => {
+  it("puts a batch back with every field unchanged", () => {
+    const held = [
+      taskWith("a", {
+        status: "done",
+        priority: "high",
+        createdAt: 42,
+        dueDate: "2026-10-24",
+      }),
+      taskWith("b", { status: "done", priority: "low", createdAt: 7 }),
+    ];
+    const restored = restoreTasks([task("c")], held);
+    expect(restored).toHaveLength(3);
+    expect(restored.find((t) => t.id === "a")).toEqual(held[0]);
+    expect(restored.find((t) => t.id === "b")).toEqual(held[1]);
+  });
+
+  it("leaves tasks that are already on the board alone", () => {
+    const tasks = [task("a")];
+    const restored = restoreTasks(tasks, [taskWith("a", { status: "done" }), task("b")]);
+    expect(restored.filter((t) => t.id === "a")).toEqual([task("a")]);
+    expect(restored.some((t) => t.id === "b")).toBe(true);
+  });
+
+  it("returns the same list when there is nothing to restore", () => {
+    const tasks = [task("a")];
+    expect(restoreTasks(tasks, [])).toBe(tasks);
+    expect(restoreTasks(tasks, [task("a")])).toBe(tasks);
+  });
+});
+
+describe("visibleDoneTasks", () => {
+  // Fixed local time: Saturday 17 October 2026.
+  const now = new Date(2026, 9, 17, 12).getTime();
+  const board = (): Task[] => [
+    taskWith("todo"),
+    taskWith("done-normal", { status: "done" }),
+    taskWith("done-high", { status: "done", priority: "high" }),
+    taskWith("done-overdue", { status: "done", dueDate: "2026-10-01" }),
+  ];
+
+  it("returns every done task when no filter hides any", () => {
+    expect(
+      visibleDoneTasks(board(), DEFAULT_FILTERS, now).map((t) => t.id),
+    ).toEqual(["done-normal", "done-high", "done-overdue"]);
+    expect(
+      visibleDoneTasks(
+        board(),
+        { ...DEFAULT_FILTERS, status: "done" },
+        now,
+      ).map((t) => t.id),
+    ).toEqual(["done-normal", "done-high", "done-overdue"]);
+  });
+
+  it("returns nothing when the status filter hides every done task", () => {
+    expect(
+      visibleDoneTasks(board(), { ...DEFAULT_FILTERS, status: "todo" }, now),
+    ).toEqual([]);
+  });
+
+  it("returns only the done tasks the priority filter shows", () => {
+    expect(
+      visibleDoneTasks(
+        board(),
+        { ...DEFAULT_FILTERS, priority: "high" },
+        now,
+      ).map((t) => t.id),
+    ).toEqual(["done-high"]);
+  });
+
+  it("returns nothing when the overdue filter hides every done task", () => {
+    expect(
+      visibleDoneTasks(
+        board(),
+        { ...DEFAULT_FILTERS, overdueOnly: true },
+        now,
+      ),
+    ).toEqual([]);
+  });
+});
+
 describe("clearDone", () => {
+  // Fixed local time: Saturday 17 October 2026.
+  const now = new Date(2026, 9, 17, 12).getTime();
+
   it("removes every done task and leaves the others alone", () => {
     const tasks = [task("a"), task("b", "doing"), task("c", "done"), task("d", "done")];
     expect(clearDone(tasks).map((t) => t.id)).toEqual(["a", "b"]);
@@ -565,6 +651,29 @@ describe("clearDone", () => {
 
   it("returns an empty board when everything is done", () => {
     expect(clearDone([task("a", "done")])).toEqual([]);
+  });
+
+  it("never clears done tasks the active filters hide", () => {
+    const tasks = [
+      taskWith("done-normal", { status: "done" }),
+      taskWith("done-high", { status: "done", priority: "high" }),
+    ];
+    const cleared = clearDone(
+      tasks,
+      { ...DEFAULT_FILTERS, priority: "high" },
+      now,
+    );
+    expect(cleared.map((t) => t.id)).toEqual(["done-normal"]);
+  });
+
+  it("clears nothing when a filter hides every done task", () => {
+    const tasks = [
+      taskWith("todo"),
+      taskWith("done", { status: "done" }),
+    ];
+    expect(
+      clearDone(tasks, { ...DEFAULT_FILTERS, status: "todo" }, now),
+    ).toBe(tasks);
   });
 });
 
