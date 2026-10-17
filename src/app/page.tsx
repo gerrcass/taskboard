@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useSyncExternalStore } from "react";
+import { BOARD_FILENAME, exportBoard } from "@/lib/exportBoard";
 import {
   DEFAULT_PRIORITY,
   PRIORITY_LABELS,
@@ -39,6 +40,20 @@ export default function Home() {
     updateTasks([...tasks, createTask(trimmed, { priority })]);
     setTitle("");
     setPriority(DEFAULT_PRIORITY);
+  };
+
+  const downloadBoard = () => {
+    const blob = new Blob([exportBoard(tasks)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = BOARD_FILENAME;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    // Revoke on the next tick so the click's navigation can start reading the
+    // blob first (revoking immediately can cancel the download in Firefox).
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
   return (
@@ -95,6 +110,13 @@ export default function Home() {
             className="h-11 shrink-0 rounded-lg border border-zinc-300 px-4 font-medium whitespace-nowrap text-zinc-700 transition-colors hover:bg-zinc-200 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
           >
             Clear done
+          </button>
+          <button
+            type="button"
+            onClick={downloadBoard}
+            className="h-11 shrink-0 rounded-lg border border-zinc-300 px-4 font-medium whitespace-nowrap text-zinc-700 transition-colors hover:bg-zinc-200 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            Export
           </button>
         </div>
 
