@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { BOARD_FILENAME, exportBoard } from "@/lib/exportBoard";
+import { parseBoard } from "@/lib/importBoard";
 import {
   DEFAULT_FILTERS,
   DEFAULT_PRIORITY,
@@ -51,6 +52,10 @@ export default function Home() {
   const [undoable, setUndoable] = useState<PendingUndo | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const undoButtonRef = useRef<HTMLButtonElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [pendingImport, setPendingImport] = useState<Task[] | null>(null);
+  const [importNotice, setImportNotice] = useState<ImportNotice | null>(null);
+  const importNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // A destructive action moves focus onto the Undo button, so a keyboard user
   // can undo it without tabbing back from the top of the page.
@@ -61,6 +66,7 @@ export default function Home() {
   useEffect(
     () => () => {
       if (undoTimer.current) clearTimeout(undoTimer.current);
+      if (importNoticeTimer.current) clearTimeout(importNoticeTimer.current);
     },
     [],
   );
@@ -151,6 +157,76 @@ export default function Home() {
     setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
+  // Import notices are transient: they clear themselves so the board returns to
+  // normal after a few seconds, and a new import clears the previous one.
+  const clearImportNotice = () => {
+    if (importNoticeTimer.current) clearTimeout(importNoticeTimer.current);
+    importNoticeTimer.current = null;
+    setImportNotice(null);
+  };
+
+  const showImportNotice = (notice: ImportNotice) => {
+    setImportNotice(notice);
+    if (importNoticeTimer.current) clearTimeout(importNoticeTimer.current);
+    importNoticeTimer.current = setTimeout(() => {
+      importNoticeTimer.current = null;
+      setImportNotice(null);
+    }, NOTICE_TIMEOUT_MS);
+  };
+
+  // Restoring a backup replaces the whole board. The filters are cleared so the
+  // restored tasks are all visible, and any pending undo from the old board is
+  // dropped because it no longer applies.
+  const applyImportedTasks = (imported: Task[]) => {
+    updateTasks(imported);
+    setFilters(DEFAULT_FILTERS);
+    setPendingImport(null);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    undoTimer.current = null;
+    setUndoable(null);
+    showImportNotice({
+      kind: "success",
+      message: `Imported ${taskCountLabel(imported.length)}.`,
+    });
+  };
+
+  const importBoardFile = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    // Reset the input so choosing the same file again still fires a change.
+    event.target.value = "";
+    if (!file) return;
+    // A fresh choice replaces any notice left over from the last one.
+    clearImportNotice();
+
+    let text: string;
+    try {
+      text = await file.text();
+    } catch {
+      showImportNotice({
+        kind: "error",
+        message: "That file could not be read.",
+      });
+      return;
+    }
+
+    const result = parseBoard(text);
+    if (!result.ok) {
+      setPendingImport(null);
+      showImportNotice({ kind: "error", message: result.error });
+      return;
+    }
+
+    // An empty board has nothing to lose, so it imports straight away. An
+    // existing board is only replaced after a confirmation.
+    if (tasks.length === 0) {
+      applyImportedTasks(result.tasks);
+      return;
+    }
+    setPendingImport(result.tasks);
+  };
+
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 font-sans dark:bg-zinc-950">
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-12">
@@ -234,6 +310,21 @@ export default function Home() {
           >
             Export
           </button>
+          <button
+            type="button"
+            onClick={() => importInputRef.current?.click()}
+            className="h-11 shrink-0 rounded-lg border border-zinc-300 px-4 font-medium whitespace-nowrap text-zinc-700 transition-colors hover:bg-zinc-200 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            Import
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".json,application/json"
+            onChange={importBoardFile}
+            className="hidden"
+            aria-label="Import a board file"
+          />
         </div>
 
         <div
@@ -374,8 +465,41 @@ export default function Home() {
         <div
           role="status"
           aria-live="polite"
-          className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-6"
+          className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex flex-col items-center gap-2 px-6"
         >
+          {pendingImport && (
+            <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-3 rounded-full border border-zinc-200 bg-white py-1.5 pr-1.5 pl-4 text-sm text-zinc-700 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+              <span>
+                Replace your board with {taskCountLabel(pendingImport.length)}{" "}
+                from this file?
+              </span>
+              <button
+                type="button"
+                onClick={() => applyImportedTasks(pendingImport)}
+                className="rounded-full bg-zinc-900 px-3 py-1 font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              >
+                Replace
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingImport(null)}
+                className="rounded-full border border-zinc-300 px-3 py-1 font-medium text-zinc-700 transition-colors hover:bg-zinc-200 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+          {importNotice && (
+            <div
+              className={`pointer-events-auto rounded-full border px-4 py-1.5 text-sm shadow-lg ${
+                importNotice.kind === "error"
+                  ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950 dark:text-red-300"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950 dark:text-emerald-300"
+              }`}
+            >
+              {importNotice.message}
+            </div>
+          )}
           {undoable && (
             <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-zinc-200 bg-white py-1.5 pr-1.5 pl-4 text-sm text-zinc-700 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
               <span>{undoable.message}</span>
@@ -397,6 +521,7 @@ export default function Home() {
 }
 
 const UNDO_TIMEOUT_MS = 10_000;
+const NOTICE_TIMEOUT_MS = 5_000;
 
 // A destructive action waiting to be undone: the tasks to put back and the
 // notice shown for it.
@@ -405,6 +530,17 @@ type PendingUndo = {
   message: string;
   label: string;
 };
+
+// A short-lived message about the last import: a rejection reason or the count
+// of tasks that were restored.
+type ImportNotice = {
+  kind: "success" | "error";
+  message: string;
+};
+
+function taskCountLabel(count: number): string {
+  return count === 1 ? "1 task" : `${count} tasks`;
+}
 
 const STATUS_FILTER_OPTIONS: readonly {
   value: TaskStatusFilter;
