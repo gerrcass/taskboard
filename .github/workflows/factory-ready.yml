@@ -20,6 +20,7 @@ jobs:
     if: >-
       github.event.label.name == 'ready' &&
       github.event.issue.state == 'open' &&
+      github.event.issue.pull_request == null &&
       contains(fromJSON('["gerrcass"]'), github.actor)
     runs-on: ubuntu-latest
     steps:
