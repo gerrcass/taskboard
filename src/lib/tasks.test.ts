@@ -4,6 +4,7 @@ import {
   advanceTask,
   clearDone,
   clearDueDate,
+  compareTasks,
   createTask,
   deleteTask,
   dueDateLabel,
@@ -144,6 +145,123 @@ describe("taskPriority", () => {
       createdAt: 0,
     } as Task;
     expect(taskPriority(legacy)).toBe("normal");
+  });
+});
+
+describe("compareTasks", () => {
+  const ordered = (id: string, overrides: Partial<Task> = {}): Task => ({
+    ...task(id),
+    ...overrides,
+  });
+
+  it("puts higher priority first regardless of due date or age", () => {
+    const tasks = [
+      ordered("low", { priority: "low" }),
+      ordered("normal", { priority: "normal" }),
+      ordered("high", { priority: "high" }),
+    ];
+    expect(tasks.sort(compareTasks).map((t) => t.id)).toEqual([
+      "high",
+      "normal",
+      "low",
+    ]);
+  });
+
+  it("sorts by nearest due date within a priority", () => {
+    const tasks = [
+      ordered("later", { priority: "normal", dueDate: "2026-11-10" }),
+      ordered("sooner", { priority: "normal", dueDate: "2026-10-20" }),
+    ];
+    expect(tasks.sort(compareTasks).map((t) => t.id)).toEqual([
+      "sooner",
+      "later",
+    ]);
+  });
+
+  it("puts tasks without a due date after dated ones in the same priority", () => {
+    const tasks = [
+      ordered("undated", { priority: "normal" }),
+      ordered("dated", { priority: "normal", dueDate: "2026-10-20" }),
+    ];
+    expect(tasks.sort(compareTasks).map((t) => t.id)).toEqual([
+      "dated",
+      "undated",
+    ]);
+  });
+
+  it("falls back to oldest first when priority and due date match", () => {
+    const tasks = [
+      ordered("newer", { priority: "low", createdAt: 2 }),
+      ordered("older", { priority: "low", createdAt: 1 }),
+    ];
+    expect(tasks.sort(compareTasks).map((t) => t.id)).toEqual([
+      "older",
+      "newer",
+    ]);
+  });
+
+  it("treats tasks stored before priorities existed as normal", () => {
+    const legacy = {
+      id: "legacy",
+      title: "Legacy",
+      status: "todo",
+      createdAt: 0,
+    } as Task;
+    const tasks = [
+      legacy,
+      ordered("high", { priority: "high" }),
+      ordered("low", { priority: "low" }),
+    ];
+    expect(tasks.sort(compareTasks).map((t) => t.id)).toEqual([
+      "high",
+      "legacy",
+      "low",
+    ]);
+  });
+
+  it("breaks a full tie by id so the result does not depend on input order", () => {
+    const a = ordered("a");
+    const b = ordered("b");
+    const c = ordered("c");
+    expect([c, a, b].sort(compareTasks).map((t) => t.id)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+    expect([b, c, a].sort(compareTasks).map((t) => t.id)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+  });
+
+  it("orders a mixed list priority first, then due date, then age", () => {
+    const tasks = [
+      ordered("low-undated", { priority: "low", createdAt: 1 }),
+      ordered("normal-later", {
+        priority: "normal",
+        dueDate: "2026-11-10",
+        createdAt: 2,
+      }),
+      ordered("high-later", {
+        priority: "high",
+        dueDate: "2026-10-30",
+        createdAt: 3,
+      }),
+      ordered("high-sooner", {
+        priority: "high",
+        dueDate: "2026-10-20",
+        createdAt: 4,
+      }),
+      ordered("normal-undated", { priority: "normal", createdAt: 5 }),
+    ];
+    expect(tasks.sort(compareTasks).map((t) => t.id)).toEqual([
+      "high-sooner",
+      "high-later",
+      "normal-later",
+      "normal-undated",
+      "low-undated",
+    ]);
   });
 });
 
