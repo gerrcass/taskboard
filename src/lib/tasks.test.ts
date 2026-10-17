@@ -20,6 +20,7 @@ import {
   restoreTasks,
   retreatTask,
   setDueDate,
+  statusInDirection,
   taskCounts,
   taskPriority,
   taskSummary,
@@ -492,6 +493,20 @@ describe("retreatTask", () => {
     tasks = retreatTask(tasks, "a");
     expect(tasks[0].status).toBe("todo");
     expect(retreatTask(tasks, "a")).toBe(tasks);
+  });
+});
+
+describe("statusInDirection", () => {
+  it("steps forward until done and clamps there", () => {
+    expect(statusInDirection("todo", "forward")).toBe("doing");
+    expect(statusInDirection("doing", "forward")).toBe("done");
+    expect(statusInDirection("done", "forward")).toBeNull();
+  });
+
+  it("steps back until todo and clamps there", () => {
+    expect(statusInDirection("done", "back")).toBe("doing");
+    expect(statusInDirection("doing", "back")).toBe("todo");
+    expect(statusInDirection("todo", "back")).toBeNull();
   });
 });
 
