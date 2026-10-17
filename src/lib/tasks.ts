@@ -34,6 +34,21 @@ export type Task = {
   dueDate?: string;
 };
 
+export type TaskStatusFilter = TaskStatus | "all";
+export type TaskPriorityFilter = TaskPriority | "all";
+
+export type TaskFilters = {
+  status: TaskStatusFilter;
+  priority: TaskPriorityFilter;
+  overdueOnly: boolean;
+};
+
+export const DEFAULT_FILTERS: TaskFilters = {
+  status: "all",
+  priority: "all",
+  overdueOnly: false,
+};
+
 export const NEXT_STATUS: Record<TaskStatus, TaskStatus | null> = {
   todo: "doing",
   doing: "done",
@@ -167,6 +182,30 @@ export function isOverdue(task: Task, now: number = Date.now()): boolean {
   return task.dueDate < isoDay(now);
 }
 
+export function hasActiveFilters(filters: TaskFilters): boolean {
+  return (
+    filters.status !== "all" ||
+    filters.priority !== "all" ||
+    filters.overdueOnly
+  );
+}
+
+// Filtering only decides what the board shows; the stored task array is never
+// changed, so clearing the filters always brings every task back.
+export function filterTasks(
+  tasks: readonly Task[],
+  filters: TaskFilters = DEFAULT_FILTERS,
+  now: number = Date.now(),
+): Task[] {
+  return tasks.filter(
+    (task) =>
+      (filters.status === "all" || task.status === filters.status) &&
+      (filters.priority === "all" ||
+        taskPriority(task) === filters.priority) &&
+      (!filters.overdueOnly || isOverdue(task, now)),
+  );
+}
+
 export function overdueCount(
   tasks: readonly Task[],
   now: number = Date.now(),
@@ -240,6 +279,18 @@ export function taskCounts(tasks: readonly Task[]): Record<TaskStatus, number> {
     counts[task.status] += 1;
   }
   return counts;
+}
+
+// How many done tasks the active filters hide. Clear done uses this so it can
+// never delete a task the user cannot currently see.
+export function hiddenDoneCount(
+  tasks: readonly Task[],
+  filters: TaskFilters,
+  now: number = Date.now(),
+): number {
+  return (
+    taskCounts(tasks).done - taskCounts(filterTasks(tasks, filters, now)).done
+  );
 }
 
 export function taskSummary(tasks: readonly Task[]): string {

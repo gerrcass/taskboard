@@ -3,6 +3,7 @@
 import { useRef, useState, useSyncExternalStore } from "react";
 import { BOARD_FILENAME, exportBoard } from "@/lib/exportBoard";
 import {
+  DEFAULT_FILTERS,
   DEFAULT_PRIORITY,
   PRIORITY_LABELS,
   STATUS_LABELS,
@@ -15,6 +16,9 @@ import {
   createTask,
   deleteTask,
   dueDateLabel,
+  filterTasks,
+  hasActiveFilters,
+  hiddenDoneCount,
   isOverdue,
   overdueCount,
   renameTask,
@@ -23,7 +27,10 @@ import {
   taskCounts,
   taskPriority,
   taskSummary,
+  type TaskFilters,
   type TaskPriority,
+  type TaskPriorityFilter,
+  type TaskStatusFilter,
 } from "@/lib/tasks";
 import {
   getServerSnapshot,
@@ -37,9 +44,22 @@ export default function Home() {
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<TaskPriority>(DEFAULT_PRIORITY);
   const [newDueDate, setNewDueDate] = useState("");
+  const [filters, setFilters] = useState<TaskFilters>(DEFAULT_FILTERS);
 
-  const counts = taskCounts(tasks);
+  const filteredTasks = filterTasks(tasks, filters);
+  const counts = taskCounts(filteredTasks);
+  const storedCounts = taskCounts(tasks);
+  const hiddenDone = hiddenDoneCount(tasks, filters);
+  const filtering = hasActiveFilters(filters);
   const overdue = overdueCount(tasks);
+
+  const clearDoneDisabled = storedCounts.done === 0 || hiddenDone > 0;
+  const clearDoneTitle =
+    storedCounts.done === 0
+      ? "No done tasks to clear"
+      : hiddenDone > 0
+        ? "The active filters hide done tasks, so Clear done is unavailable"
+        : "Delete every done task";
 
   const addTask = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -138,7 +158,8 @@ export default function Home() {
           <button
             type="button"
             onClick={() => updateTasks(clearDone(tasks))}
-            disabled={counts.done === 0}
+            disabled={clearDoneDisabled}
+            title={clearDoneTitle}
             className="h-11 shrink-0 rounded-lg border border-zinc-300 px-4 font-medium whitespace-nowrap text-zinc-700 transition-colors hover:bg-zinc-200 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
           >
             Clear done
@@ -151,6 +172,60 @@ export default function Home() {
             Export
           </button>
         </div>
+
+        <div
+          role="group"
+          aria-label="Filters"
+          className="flex w-full flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
+        >
+          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Filter
+          </span>
+          <FilterSelect
+            label="Status"
+            value={filters.status}
+            options={STATUS_FILTER_OPTIONS}
+            onChange={(status) => setFilters({ ...filters, status })}
+          />
+          <FilterSelect
+            label="Priority"
+            value={filters.priority}
+            options={PRIORITY_FILTER_OPTIONS}
+            onChange={(priority) => setFilters({ ...filters, priority })}
+          />
+          <button
+            type="button"
+            aria-pressed={filters.overdueOnly}
+            onClick={() =>
+              setFilters({ ...filters, overdueOnly: !filters.overdueOnly })
+            }
+            className={`h-9 shrink-0 rounded-lg border px-3 text-sm font-medium transition-colors ${
+              filters.overdueOnly
+                ? "border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:bg-amber-900/60"
+                : "border-zinc-300 text-zinc-700 hover:bg-zinc-200 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            }`}
+          >
+            Overdue only
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilters(DEFAULT_FILTERS)}
+            disabled={!filtering}
+            title={filtering ? "Clear every filter" : "No filters are active"}
+            className="ml-auto h-9 shrink-0 rounded-lg border border-zinc-300 px-3 text-sm font-medium whitespace-nowrap text-zinc-700 transition-colors hover:bg-zinc-200 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            Clear filters
+          </button>
+        </div>
+
+        {filtering && filteredTasks.length === 0 && (
+          <p
+            role="status"
+            className="rounded-xl border border-dashed border-zinc-300 px-4 py-3 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400"
+          >
+            No tasks match these filters.
+          </p>
+        )}
 
         <section className="grid flex-1 grid-cols-1 gap-6 md:grid-cols-3">
           {TASK_STATUSES.map((status) => (
@@ -166,7 +241,7 @@ export default function Home() {
               </h2>
 
               <ul className="flex flex-col gap-2">
-                {tasks
+                {filteredTasks
                   .filter((task) => task.status === status)
                   .sort(compareTasks)
                   .map((task) => (
@@ -225,7 +300,7 @@ export default function Home() {
                   ))}
                 {counts[status] === 0 && (
                   <li className="rounded-lg border border-dashed border-zinc-200 px-3 py-6 text-center text-sm text-zinc-400 dark:border-zinc-700 dark:text-zinc-500">
-                    Nothing here yet
+                    {filtering ? "No matching tasks" : "Nothing here yet"}
                   </li>
                 )}
               </ul>
@@ -234,6 +309,56 @@ export default function Home() {
         </section>
       </main>
     </div>
+  );
+}
+
+const STATUS_FILTER_OPTIONS: readonly {
+  value: TaskStatusFilter;
+  label: string;
+}[] = [
+  { value: "all", label: "All" },
+  ...TASK_STATUSES.map((status) => ({
+    value: status,
+    label: STATUS_LABELS[status],
+  })),
+];
+
+const PRIORITY_FILTER_OPTIONS: readonly {
+  value: TaskPriorityFilter;
+  label: string;
+}[] = [
+  { value: "all", label: "All" },
+  { value: "high", label: PRIORITY_LABELS.high },
+  { value: "normal", label: PRIORITY_LABELS.normal },
+  { value: "low", label: PRIORITY_LABELS.low },
+];
+
+function FilterSelect<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: readonly { value: T; label: string }[];
+  onChange: (value: T) => void;
+}) {
+  return (
+    <label className="flex shrink-0 items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+      {label}
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value as T)}
+        className="h-9 rounded-lg border border-zinc-300 bg-white px-2 text-sm text-zinc-900 outline-none transition-colors focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
