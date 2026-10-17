@@ -8,10 +8,27 @@ export const STATUS_LABELS: Record<TaskStatus, string> = {
   done: "Done",
 };
 
+export type TaskPriority = "low" | "normal" | "high";
+
+export const TASK_PRIORITIES: readonly TaskPriority[] = [
+  "low",
+  "normal",
+  "high",
+];
+
+export const PRIORITY_LABELS: Record<TaskPriority, string> = {
+  low: "Low",
+  normal: "Normal",
+  high: "High",
+};
+
+export const DEFAULT_PRIORITY: TaskPriority = "normal";
+
 export type Task = {
   id: string;
   title: string;
   status: TaskStatus;
+  priority: TaskPriority;
   createdAt: number;
 };
 
@@ -29,7 +46,11 @@ export const PREVIOUS_STATUS: Record<TaskStatus, TaskStatus | null> = {
 
 export function createTask(
   title: string,
-  options: { id?: string; now?: number } = {},
+  options: {
+    id?: string;
+    now?: number;
+    priority?: TaskPriority;
+  } = {},
 ): Task {
   const trimmed = title.trim();
   if (!trimmed) {
@@ -39,8 +60,15 @@ export function createTask(
     id: options.id ?? crypto.randomUUID(),
     title: trimmed,
     status: "todo",
+    priority: options.priority ?? DEFAULT_PRIORITY,
     createdAt: options.now ?? Date.now(),
   };
+}
+
+// Tasks stored before priorities existed have no `priority` field. They read
+// back as normal rather than being migrated in place.
+export function taskPriority(task: Task): TaskPriority {
+  return task.priority ?? DEFAULT_PRIORITY;
 }
 
 export function moveTask(
