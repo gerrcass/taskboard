@@ -10,10 +10,14 @@ import {
   TASK_STATUSES,
   advanceTask,
   clearDone,
+  clearDueDate,
   createTask,
   deleteTask,
+  dueDateLabel,
+  isOverdue,
   renameTask,
   retreatTask,
+  setDueDate,
   taskCounts,
   taskPriority,
   taskSummary,
@@ -30,6 +34,7 @@ export default function Home() {
   const tasks = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<TaskPriority>(DEFAULT_PRIORITY);
+  const [newDueDate, setNewDueDate] = useState("");
 
   const counts = taskCounts(tasks);
 
@@ -37,9 +42,13 @@ export default function Home() {
     event.preventDefault();
     const trimmed = title.trim();
     if (!trimmed) return;
-    updateTasks([...tasks, createTask(trimmed, { priority })]);
+    updateTasks([
+      ...tasks,
+      createTask(trimmed, { priority, dueDate: newDueDate || undefined }),
+    ]);
     setTitle("");
     setPriority(DEFAULT_PRIORITY);
+    setNewDueDate("");
   };
 
   const downloadBoard = () => {
@@ -72,14 +81,17 @@ export default function Home() {
           </p>
         </header>
 
-        <div className="flex w-full max-w-xl flex-wrap items-center gap-3">
-          <form onSubmit={addTask} className="flex min-w-0 flex-1 flex-wrap gap-3">
+        <div className="flex w-full flex-wrap items-center gap-3">
+          <form
+            onSubmit={addTask}
+            className="flex w-full flex-wrap items-center gap-3 lg:w-auto lg:min-w-0 lg:flex-1"
+          >
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="What needs doing?"
               aria-label="New task title"
-              className="h-11 w-full min-w-0 rounded-lg border border-zinc-300 bg-white px-4 text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-zinc-500 sm:w-auto sm:flex-1 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400"
+              className="h-11 w-full min-w-0 rounded-lg border border-zinc-300 bg-white px-4 text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-zinc-500 sm:w-auto sm:min-w-[12rem] sm:flex-1 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400"
             />
             <select
               value={priority}
@@ -95,6 +107,14 @@ export default function Home() {
                 </option>
               ))}
             </select>
+            <input
+              type="date"
+              value={newDueDate}
+              onChange={(event) => setNewDueDate(event.target.value)}
+              aria-label="New task due date"
+              title="Due date (optional)"
+              className="h-11 shrink-0 rounded-lg border border-zinc-300 bg-white px-3 text-zinc-900 outline-none transition-colors focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400"
+            />
             <button
               type="submit"
               className="h-11 shrink-0 rounded-lg bg-zinc-900 px-5 font-medium whitespace-nowrap text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
@@ -139,41 +159,55 @@ export default function Home() {
                   .map((task) => (
                     <li
                       key={task.id}
-                      className="group flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800"
+                      className="group flex flex-col gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800"
                     >
-                      <PriorityBadge priority={taskPriority(task)} />
-                      <TaskTitle
-                        title={task.title}
-                        onRename={(next) =>
-                          updateTasks(renameTask(tasks, task.id, next))
-                        }
-                      />
-                      <button
-                        type="button"
-                        aria-label={`Move "${task.title}" back`}
-                        onClick={() => updateTasks(retreatTask(tasks, task.id))}
-                        disabled={status === "todo"}
-                        className="rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-700 disabled:invisible dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
-                      >
-                        ←
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Move "${task.title}" forward`}
-                        onClick={() => updateTasks(advanceTask(tasks, task.id))}
-                        disabled={status === "done"}
-                        className="rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-700 disabled:invisible dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
-                      >
-                        →
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Delete "${task.title}"`}
-                        onClick={() => updateTasks(deleteTask(tasks, task.id))}
-                        className="rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/40 dark:hover:text-red-400"
-                      >
-                        ×
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <PriorityBadge priority={taskPriority(task)} />
+                        <TaskTitle
+                          title={task.title}
+                          onRename={(next) =>
+                            updateTasks(renameTask(tasks, task.id, next))
+                          }
+                        />
+                        <button
+                          type="button"
+                          aria-label={`Move "${task.title}" back`}
+                          onClick={() => updateTasks(retreatTask(tasks, task.id))}
+                          disabled={status === "todo"}
+                          className="rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-700 disabled:invisible dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+                        >
+                          ←
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Move "${task.title}" forward`}
+                          onClick={() => updateTasks(advanceTask(tasks, task.id))}
+                          disabled={status === "done"}
+                          className="rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-700 disabled:invisible dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+                        >
+                          →
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Delete "${task.title}"`}
+                          onClick={() => updateTasks(deleteTask(tasks, task.id))}
+                          className="rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/40 dark:hover:text-red-400"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      {task.dueDate && (
+                        <DueDate
+                          dueDate={task.dueDate}
+                          overdue={isOverdue(task)}
+                          onChange={(next) =>
+                            updateTasks(setDueDate(tasks, task.id, next))
+                          }
+                          onClear={() =>
+                            updateTasks(clearDueDate(tasks, task.id))
+                          }
+                        />
+                      )}
                     </li>
                   ))}
                 {counts[status] === 0 && (
@@ -258,3 +292,75 @@ function TaskTitle({
   );
 }
 
+function DueDate({
+  dueDate,
+  overdue,
+  onChange,
+  onClear,
+}: {
+  dueDate: string;
+  overdue: boolean;
+  onChange: (dueDate: string) => void;
+  onClear: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const cancelled = useRef(false);
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          cancelled.current = false;
+          setEditing(true);
+        }}
+        title="Click to change the due date"
+        className={`inline-flex w-fit items-center gap-1.5 self-start rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
+          overdue
+            ? "bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:bg-amber-900/60"
+            : "bg-zinc-200 text-zinc-600 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600"
+        }`}
+      >
+        {overdue && (
+          <span
+            aria-hidden
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+          />
+        )}
+        {dueDateLabel(dueDate)}
+        {overdue && <span className="font-semibold">· Overdue</span>}
+      </button>
+    );
+  }
+
+  return (
+    <input
+      type="date"
+      defaultValue={dueDate}
+      autoFocus
+      aria-label="Edit task due date"
+      onBlur={(event) => {
+        if (cancelled.current) {
+          setEditing(false);
+          return;
+        }
+        const value = event.currentTarget.value;
+        if (!value) {
+          onClear();
+        } else if (value !== dueDate) {
+          onChange(value);
+        }
+        setEditing(false);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.currentTarget.blur();
+        } else if (event.key === "Escape") {
+          cancelled.current = true;
+          setEditing(false);
+        }
+      }}
+      className="h-8 w-fit self-start rounded border border-zinc-400 bg-white px-2 text-sm text-zinc-900 outline-none dark:border-zinc-500 dark:bg-zinc-900 dark:text-zinc-100"
+    />
+  );
+}

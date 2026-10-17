@@ -3,11 +3,15 @@ import {
   DEFAULT_PRIORITY,
   advanceTask,
   clearDone,
+  clearDueDate,
   createTask,
   deleteTask,
+  dueDateLabel,
+  isOverdue,
   moveTask,
   renameTask,
   retreatTask,
+  setDueDate,
   taskCounts,
   taskPriority,
   taskSummary,
@@ -35,12 +39,95 @@ describe("createTask", () => {
   });
 
   it("keeps an explicit priority", () => {
-    const created = createTask("Ship the demo", { priority: "high" });
+    const created = createTask("Ship the demo", {
+      id: "a",
+      now: 42,
+      priority: "high",
+    });
     expect(created.priority).toBe("high");
+  });
+
+  it("keeps a due date when one is given", () => {
+    const created = createTask("Ship the demo", {
+      id: "a",
+      now: 42,
+      dueDate: "2026-10-24",
+    });
+    expect(created.dueDate).toBe("2026-10-24");
+  });
+
+  it("leaves the due date off when none is given", () => {
+    const created = createTask("Ship the demo", { id: "a", now: 42 });
+    expect(created.dueDate).toBeUndefined();
   });
 
   it("rejects an empty title", () => {
     expect(() => createTask("   ")).toThrow("A task needs a title");
+  });
+});
+
+describe("setDueDate", () => {
+  it("sets a due date on only the named task", () => {
+    const tasks = [task("a"), task("b")];
+    const updated = setDueDate(tasks, "a", "2026-10-24");
+    expect(updated[0].dueDate).toBe("2026-10-24");
+    expect(updated[1].dueDate).toBeUndefined();
+  });
+
+  it("returns the same array when the date is unchanged or the id is unknown", () => {
+    const tasks = [{ ...task("a"), dueDate: "2026-10-24" }];
+    expect(setDueDate(tasks, "a", "2026-10-24")).toBe(tasks);
+    expect(setDueDate(tasks, "missing", "2026-11-01")).toBe(tasks);
+    expect(setDueDate(tasks, "a", "")).toBe(tasks);
+  });
+});
+
+describe("clearDueDate", () => {
+  it("removes the due date from only the named task", () => {
+    const tasks = [
+      { ...task("a"), dueDate: "2026-10-24" },
+      { ...task("b"), dueDate: "2026-11-01" },
+    ];
+    const cleared = clearDueDate(tasks, "a");
+    expect(cleared[0].dueDate).toBeUndefined();
+    expect(cleared[1].dueDate).toBe("2026-11-01");
+  });
+
+  it("returns the same array when there is nothing to clear", () => {
+    const tasks = [task("a")];
+    expect(clearDueDate(tasks, "a")).toBe(tasks);
+    expect(clearDueDate(tasks, "missing")).toBe(tasks);
+  });
+});
+
+describe("isOverdue", () => {
+  // Fixed local time: Saturday 17 October 2026.
+  const now = new Date(2026, 9, 17, 12).getTime();
+
+  it("is false without a due date", () => {
+    expect(isOverdue(task("a"), now)).toBe(false);
+  });
+
+  it("is false on and before the due day", () => {
+    expect(isOverdue({ ...task("a"), dueDate: "2026-10-17" }, now)).toBe(false);
+    expect(isOverdue({ ...task("a"), dueDate: "2026-10-24" }, now)).toBe(false);
+  });
+
+  it("is true once the due day has passed", () => {
+    expect(isOverdue({ ...task("a"), dueDate: "2026-10-16" }, now)).toBe(true);
+  });
+
+  it("is false for a done task even after its due date", () => {
+    expect(
+      isOverdue({ ...task("a", "done"), dueDate: "2026-10-16" }, now),
+    ).toBe(false);
+  });
+});
+
+describe("dueDateLabel", () => {
+  it("reads the stored date as a short plain-language label", () => {
+    expect(dueDateLabel("2026-10-24")).toBe("Due Oct 24");
+    expect(dueDateLabel("2026-01-05")).toBe("Due Jan 5");
   });
 });
 
