@@ -266,6 +266,17 @@ export function deleteTask(tasks: readonly Task[], id: string): Task[] {
   return tasks.filter((t) => t.id !== id);
 }
 
+// Puts a task that was deleted back on the board. The caller holds the whole
+// task, so every field — title, status, priority, due date and creation time —
+// comes back exactly as it was. Where it lands does not matter: the columns
+// sort with `compareTasks`, so a restored task returns to its usual place.
+export function restoreTask(tasks: readonly Task[], task: Task): Task[] {
+  if (tasks.some((t) => t.id === task.id)) {
+    return tasks as Task[];
+  }
+  return [...tasks, task];
+}
+
 export function clearDone(tasks: readonly Task[]): Task[] {
   if (!tasks.some((t) => t.status === "done")) {
     return tasks as Task[];

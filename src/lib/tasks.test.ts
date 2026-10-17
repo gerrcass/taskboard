@@ -16,6 +16,7 @@ import {
   moveTask,
   overdueCount,
   renameTask,
+  restoreTask,
   retreatTask,
   setDueDate,
   taskCounts,
@@ -522,6 +523,32 @@ describe("deleteTask", () => {
   it("returns the same array for an unknown id", () => {
     const tasks = [task("a")];
     expect(deleteTask(tasks, "nope")).toBe(tasks);
+  });
+});
+
+describe("restoreTask", () => {
+  it("puts the held task back with every field unchanged", () => {
+    const held = taskWith("a", {
+      status: "doing",
+      priority: "high",
+      createdAt: 42,
+      dueDate: "2026-10-24",
+    });
+    const restored = restoreTask([task("b")], held);
+    expect(restored).toHaveLength(2);
+    expect(restored.find((t) => t.id === "a")).toEqual(held);
+  });
+
+  it("returns a new list and leaves the other tasks alone", () => {
+    const tasks = [task("b"), task("c")];
+    const restored = restoreTask(tasks, task("a"));
+    expect(restored).not.toBe(tasks);
+    expect(restored.filter((t) => t.id !== "a")).toEqual(tasks);
+  });
+
+  it("returns the same list when the task is already there", () => {
+    const tasks = [task("a")];
+    expect(restoreTask(tasks, task("a"))).toBe(tasks);
   });
 });
 
