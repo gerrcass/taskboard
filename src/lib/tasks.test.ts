@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_PRIORITY,
   advanceTask,
   clearDone,
   createTask,
@@ -8,6 +9,7 @@ import {
   renameTask,
   retreatTask,
   taskCounts,
+  taskPriority,
   taskSummary,
   type Task,
 } from "./tasks";
@@ -16,22 +18,45 @@ const task = (id: string, status: Task["status"] = "todo"): Task => ({
   id,
   title: `Task ${id}`,
   status,
+  priority: DEFAULT_PRIORITY,
   createdAt: 0,
 });
 
 describe("createTask", () => {
-  it("trims the title and starts in todo", () => {
+  it("trims the title, starts in todo and defaults to normal priority", () => {
     const created = createTask("  Ship the demo  ", { id: "a", now: 42 });
     expect(created).toEqual({
       id: "a",
       title: "Ship the demo",
       status: "todo",
+      priority: "normal",
       createdAt: 42,
     });
   });
 
+  it("keeps an explicit priority", () => {
+    const created = createTask("Ship the demo", { priority: "high" });
+    expect(created.priority).toBe("high");
+  });
+
   it("rejects an empty title", () => {
     expect(() => createTask("   ")).toThrow("A task needs a title");
+  });
+});
+
+describe("taskPriority", () => {
+  it("returns the task's priority", () => {
+    expect(taskPriority({ ...task("a"), priority: "low" })).toBe("low");
+  });
+
+  it("falls back to normal for tasks stored before priorities existed", () => {
+    const legacy = {
+      id: "a",
+      title: "Task a",
+      status: "todo",
+      createdAt: 0,
+    } as Task;
+    expect(taskPriority(legacy)).toBe("normal");
   });
 });
 

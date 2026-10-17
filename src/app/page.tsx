@@ -2,7 +2,10 @@
 
 import { useRef, useState, useSyncExternalStore } from "react";
 import {
+  DEFAULT_PRIORITY,
+  PRIORITY_LABELS,
   STATUS_LABELS,
+  TASK_PRIORITIES,
   TASK_STATUSES,
   advanceTask,
   clearDone,
@@ -11,7 +14,9 @@ import {
   renameTask,
   retreatTask,
   taskCounts,
+  taskPriority,
   taskSummary,
+  type TaskPriority,
 } from "@/lib/tasks";
 import {
   getServerSnapshot,
@@ -23,6 +28,7 @@ import {
 export default function Home() {
   const tasks = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const [title, setTitle] = useState("");
+  const [priority, setPriority] = useState<TaskPriority>(DEFAULT_PRIORITY);
 
   const counts = taskCounts(tasks);
 
@@ -30,8 +36,9 @@ export default function Home() {
     event.preventDefault();
     const trimmed = title.trim();
     if (!trimmed) return;
-    updateTasks([...tasks, createTask(trimmed)]);
+    updateTasks([...tasks, createTask(trimmed, { priority })]);
     setTitle("");
+    setPriority(DEFAULT_PRIORITY);
   };
 
   return (
@@ -50,18 +57,32 @@ export default function Home() {
           </p>
         </header>
 
-        <div className="flex w-full max-w-xl items-center gap-3">
-          <form onSubmit={addTask} className="flex flex-1 gap-3">
+        <div className="flex w-full max-w-xl flex-wrap items-center gap-3">
+          <form onSubmit={addTask} className="flex min-w-0 flex-1 flex-wrap gap-3">
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="What needs doing?"
               aria-label="New task title"
-              className="h-11 flex-1 rounded-lg border border-zinc-300 bg-white px-4 text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400"
+              className="h-11 w-full min-w-0 rounded-lg border border-zinc-300 bg-white px-4 text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-zinc-500 sm:w-auto sm:flex-1 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400"
             />
+            <select
+              value={priority}
+              onChange={(event) =>
+                setPriority(event.target.value as TaskPriority)
+              }
+              aria-label="New task priority"
+              className="h-11 shrink-0 rounded-lg border border-zinc-300 bg-white px-3 text-zinc-900 outline-none transition-colors focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-400"
+            >
+              {TASK_PRIORITIES.map((value) => (
+                <option key={value} value={value}>
+                  {PRIORITY_LABELS[value]}
+                </option>
+              ))}
+            </select>
             <button
               type="submit"
-              className="h-11 rounded-lg bg-zinc-900 px-5 font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              className="h-11 shrink-0 rounded-lg bg-zinc-900 px-5 font-medium whitespace-nowrap text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
               disabled={!title.trim()}
             >
               Add task
@@ -71,7 +92,7 @@ export default function Home() {
             type="button"
             onClick={() => updateTasks(clearDone(tasks))}
             disabled={counts.done === 0}
-            className="h-11 rounded-lg border border-zinc-300 px-4 font-medium text-zinc-700 transition-colors hover:bg-zinc-200 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            className="h-11 shrink-0 rounded-lg border border-zinc-300 px-4 font-medium whitespace-nowrap text-zinc-700 transition-colors hover:bg-zinc-200 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
           >
             Clear done
           </button>
@@ -98,6 +119,7 @@ export default function Home() {
                       key={task.id}
                       className="group flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800"
                     >
+                      <PriorityBadge priority={taskPriority(task)} />
                       <TaskTitle
                         title={task.title}
                         onRename={(next) =>
@@ -143,6 +165,22 @@ export default function Home() {
         </section>
       </main>
     </div>
+  );
+}
+
+const PRIORITY_STYLES: Record<TaskPriority, string> = {
+  low: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
+  normal: "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300",
+  high: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+};
+
+function PriorityBadge({ priority }: { priority: TaskPriority }) {
+  return (
+    <span
+      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${PRIORITY_STYLES[priority]}`}
+    >
+      {PRIORITY_LABELS[priority]}
+    </span>
   );
 }
 
