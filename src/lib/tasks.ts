@@ -37,6 +37,9 @@ export type Task = {
 export type TaskStatusFilter = TaskStatus | "all";
 export type TaskPriorityFilter = TaskPriority | "all";
 
+/** Which way a task moves between columns: forward is right, back is left. */
+export type MoveDirection = "back" | "forward";
+
 export type TaskFilters = {
   status: TaskStatusFilter;
   priority: TaskPriorityFilter;
@@ -244,6 +247,17 @@ export function retreatTask(tasks: readonly Task[], id: string): Task[] {
   const task = tasks.find((t) => t.id === id);
   const previous = task ? PREVIOUS_STATUS[task.status] : null;
   return previous ? moveTask(tasks, id, previous) : (tasks as Task[]);
+}
+
+// The column a task moves to in `direction`, or null at an end of the board.
+// The arrow buttons and arrow keys share this so both clamp the same way.
+export function statusInDirection(
+  status: TaskStatus,
+  direction: MoveDirection,
+): TaskStatus | null {
+  return direction === "forward"
+    ? NEXT_STATUS[status]
+    : PREVIOUS_STATUS[status];
 }
 
 export function renameTask(

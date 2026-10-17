@@ -10,7 +10,6 @@ import {
   STATUS_LABELS,
   TASK_PRIORITIES,
   TASK_STATUSES,
-  advanceTask,
   clearDone,
   clearDueDate,
   compareTasks,
@@ -21,15 +20,17 @@ import {
   hasActiveFilters,
   hiddenDoneCount,
   isOverdue,
+  moveTask,
   overdueCount,
   renameTask,
   restoreTasks,
-  retreatTask,
   setDueDate,
+  statusInDirection,
   taskCounts,
   taskPriority,
   taskSummary,
   visibleDoneTasks,
+  type MoveDirection,
   type Task,
   type TaskFilters,
   type TaskPriority,
@@ -56,12 +57,25 @@ export default function Home() {
   const [pendingImport, setPendingImport] = useState<Task[] | null>(null);
   const [importNotice, setImportNotice] = useState<ImportNotice | null>(null);
   const importNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A keyboard move asks the destination card to take focus. The id lives in a
+  // ref so clearing it after the ref callbacks have run needs no extra render,
+  // and a request that never finds its card (because the active filters hide
+  // that column) cannot steal focus later on.
+  const focusRequest = useRef<string | null>(null);
+  const [moveAnnouncement, setMoveAnnouncement] = useState("");
 
   // A destructive action moves focus onto the Undo button, so a keyboard user
   // can undo it without tabbing back from the top of the page.
   useEffect(() => {
     if (undoable) undoButtonRef.current?.focus();
   }, [undoable]);
+
+  // Runs after the ref callbacks each render: if a card claimed the pending
+  // focus request it has already taken focus, and the request is dropped either
+  // way so it is never consumed at some later, unrelated moment.
+  useEffect(() => {
+    focusRequest.current = null;
+  });
 
   useEffect(
     () => () => {
@@ -117,6 +131,21 @@ export default function Home() {
       message: "Task deleted",
       label: `Undo delete of "${task.title}"`,
     });
+  };
+
+  // Moves a task one column and announces where it landed. The arrow buttons
+  // and the arrow keys both call this, so the direction logic and the message
+  // live in one place and the keyboard's live region serves both.
+  const moveTaskBy = (task: Task, direction: MoveDirection) => {
+    const status = statusInDirection(task.status, direction);
+    if (!status) return;
+    // Set the focus request before the store update so the destination card's
+    // ref callback always sees it, then announce where the task landed.
+    focusRequest.current = task.id;
+    updateTasks(moveTask(tasks, task.id, status));
+    // The title is part of the message so two tasks moved to the same column
+    // still change the live region instead of announcing the same string.
+    setMoveAnnouncement(`"${task.title}" moved to ${STATUS_LABELS[status]}`);
   };
 
   // Clearing holds every task it removed so one click puts them all back. The
@@ -401,7 +430,26 @@ export default function Home() {
                   .map((task) => (
                     <li
                       key={task.id}
-                      className="group flex flex-col gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800"
+                      ref={(element) => {
+                        if (element && focusRequest.current === task.id) {
+                          element.focus();
+                        }
+                      }}
+                      tabIndex={0}
+                      aria-label={`Task "${task.title}", ${STATUS_LABELS[status]}`}
+                      onKeyDown={(event) => {
+                        // Only when the card itself has focus, so arrow keys
+                        // inside the rename input or date picker keep editing.
+                        if (event.target !== event.currentTarget) return;
+                        if (event.key === "ArrowLeft") {
+                          event.preventDefault();
+                          moveTaskBy(task, "back");
+                        } else if (event.key === "ArrowRight") {
+                          event.preventDefault();
+                          moveTaskBy(task, "forward");
+                        }
+                      }}
+                      className="group flex flex-col gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:focus-visible:ring-zinc-400"
                     >
                       <div className="flex items-center gap-2">
                         <PriorityBadge priority={taskPriority(task)} />
@@ -414,7 +462,7 @@ export default function Home() {
                         <button
                           type="button"
                           aria-label={`Move "${task.title}" back`}
-                          onClick={() => updateTasks(retreatTask(tasks, task.id))}
+                          onClick={() => moveTaskBy(task, "back")}
                           disabled={status === "todo"}
                           className="rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-700 disabled:invisible dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
                         >
@@ -423,7 +471,7 @@ export default function Home() {
                         <button
                           type="button"
                           aria-label={`Move "${task.title}" forward`}
-                          onClick={() => updateTasks(advanceTask(tasks, task.id))}
+                          onClick={() => moveTaskBy(task, "forward")}
                           disabled={status === "done"}
                           className="rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-700 disabled:invisible dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
                         >
@@ -461,6 +509,10 @@ export default function Home() {
             </div>
           ))}
         </section>
+
+        <p role="status" aria-live="polite" className="sr-only">
+          {moveAnnouncement}
+        </p>
 
         <div
           role="status"
