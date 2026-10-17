@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   advanceTask,
+  clearDone,
   createTask,
   deleteTask,
   moveTask,
@@ -80,6 +81,22 @@ describe("deleteTask", () => {
   it("returns the same array for an unknown id", () => {
     const tasks = [task("a")];
     expect(deleteTask(tasks, "nope")).toBe(tasks);
+  });
+});
+
+describe("clearDone", () => {
+  it("removes every done task and leaves the others alone", () => {
+    const tasks = [task("a"), task("b", "doing"), task("c", "done"), task("d", "done")];
+    expect(clearDone(tasks).map((t) => t.id)).toEqual(["a", "b"]);
+  });
+
+  it("returns the same array when nothing is done", () => {
+    const tasks = [task("a"), task("b", "doing")];
+    expect(clearDone(tasks)).toBe(tasks);
+  });
+
+  it("returns an empty board when everything is done", () => {
+    expect(clearDone([task("a", "done")])).toEqual([]);
   });
 });
 
