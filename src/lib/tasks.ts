@@ -81,3 +81,13 @@ export function taskCounts(tasks: readonly Task[]): Record<TaskStatus, number> {
   }
   return counts;
 }
+
+export function taskSummary(tasks: readonly Task[]): string {
+  const total = tasks.length;
+  if (total === 0) {
+    return "No tasks yet — add one to get started";
+  }
+  const done = taskCounts(tasks).done;
+  const totalLabel = total === 1 ? "1 task" : `${total} tasks`;
+  return `${totalLabel} · ${done} done`;
+}
