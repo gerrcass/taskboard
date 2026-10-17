@@ -67,6 +67,19 @@ export function retreatTask(tasks: readonly Task[], id: string): Task[] {
   return previous ? moveTask(tasks, id, previous) : (tasks as Task[]);
 }
 
+export function renameTask(
+  tasks: readonly Task[],
+  id: string,
+  title: string,
+): Task[] {
+  const task = tasks.find((t) => t.id === id);
+  const trimmed = title.trim();
+  if (!task || !trimmed || trimmed === task.title) {
+    return tasks as Task[];
+  }
+  return tasks.map((t) => (t.id === id ? { ...t, title: trimmed } : t));
+}
+
 export function deleteTask(tasks: readonly Task[], id: string): Task[] {
   if (!tasks.some((t) => t.id === id)) {
     return tasks as Task[];

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import {
   STATUS_LABELS,
   TASK_STATUSES,
   advanceTask,
   createTask,
   deleteTask,
+  renameTask,
   retreatTask,
   taskCounts,
   taskSummary,
@@ -86,9 +87,12 @@ export default function Home() {
                       key={task.id}
                       className="group flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800"
                     >
-                      <span className="flex-1 break-words text-sm text-zinc-800 dark:text-zinc-100">
-                        {task.title}
-                      </span>
+                      <TaskTitle
+                        title={task.title}
+                        onRename={(next) =>
+                          updateTasks(renameTask(tasks, task.id, next))
+                        }
+                      />
                       <button
                         type="button"
                         aria-label={`Move "${task.title}" back`}
@@ -130,3 +134,56 @@ export default function Home() {
     </div>
   );
 }
+
+function TaskTitle({
+  title,
+  onRename,
+}: {
+  title: string;
+  onRename: (title: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(title);
+  const cancelled = useRef(false);
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          cancelled.current = false;
+          setDraft(title);
+          setEditing(true);
+        }}
+        title="Click to rename"
+        className="flex-1 break-words text-left text-sm text-zinc-800 dark:text-zinc-100"
+      >
+        {title}
+      </button>
+    );
+  }
+
+  return (
+    <input
+      value={draft}
+      autoFocus
+      aria-label="Edit task title"
+      onChange={(event) => setDraft(event.target.value)}
+      onFocus={(event) => event.currentTarget.select()}
+      onBlur={() => {
+        if (!cancelled.current) onRename(draft);
+        setEditing(false);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.currentTarget.blur();
+        } else if (event.key === "Escape") {
+          cancelled.current = true;
+          setEditing(false);
+        }
+      }}
+      className="h-8 min-w-0 flex-1 rounded border border-zinc-400 bg-white px-2 text-sm text-zinc-900 outline-none dark:border-zinc-500 dark:bg-zinc-900 dark:text-zinc-100"
+    />
+  );
+}
+
