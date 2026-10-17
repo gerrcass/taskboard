@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { BOARD_FILENAME, exportBoard } from "@/lib/exportBoard";
 import {
   DEFAULT_FILTERS,
@@ -22,11 +22,13 @@ import {
   isOverdue,
   overdueCount,
   renameTask,
+  restoreTask,
   retreatTask,
   setDueDate,
   taskCounts,
   taskPriority,
   taskSummary,
+  type Task,
   type TaskFilters,
   type TaskPriority,
   type TaskPriorityFilter,
@@ -45,6 +47,22 @@ export default function Home() {
   const [priority, setPriority] = useState<TaskPriority>(DEFAULT_PRIORITY);
   const [newDueDate, setNewDueDate] = useState("");
   const [filters, setFilters] = useState<TaskFilters>(DEFAULT_FILTERS);
+  const [undoable, setUndoable] = useState<Task | null>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const undoButtonRef = useRef<HTMLButtonElement>(null);
+
+  // A deletion moves focus onto the Undo button, so a keyboard user can undo it
+  // without tabbing back from the top of the page.
+  useEffect(() => {
+    if (undoable) undoButtonRef.current?.focus();
+  }, [undoable]);
+
+  useEffect(
+    () => () => {
+      if (undoTimer.current) clearTimeout(undoTimer.current);
+    },
+    [],
+  );
 
   const filteredTasks = filterTasks(tasks, filters);
   const counts = taskCounts(filteredTasks);
@@ -72,6 +90,26 @@ export default function Home() {
     setTitle("");
     setPriority(DEFAULT_PRIORITY);
     setNewDueDate("");
+  };
+
+  // Deleting arms a single undo. A second deletion replaces the notice, so only
+  // the most recent deletion can be brought back.
+  const deleteTaskWithUndo = (task: Task) => {
+    updateTasks(deleteTask(tasks, task.id));
+    setUndoable(task);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    undoTimer.current = setTimeout(() => {
+      undoTimer.current = null;
+      setUndoable(null);
+    }, UNDO_TIMEOUT_MS);
+  };
+
+  const undoDelete = () => {
+    if (!undoable) return;
+    updateTasks(restoreTask(tasks, undoable));
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    undoTimer.current = null;
+    setUndoable(null);
   };
 
   const downloadBoard = () => {
@@ -278,7 +316,7 @@ export default function Home() {
                         <button
                           type="button"
                           aria-label={`Delete "${task.title}"`}
-                          onClick={() => updateTasks(deleteTask(tasks, task.id))}
+                          onClick={() => deleteTaskWithUndo(task)}
                           className="rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/40 dark:hover:text-red-400"
                         >
                           ×
@@ -307,10 +345,33 @@ export default function Home() {
             </div>
           ))}
         </section>
+
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-6"
+        >
+          {undoable && (
+            <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-zinc-200 bg-white py-1.5 pr-1.5 pl-4 text-sm text-zinc-700 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+              <span>Task deleted</span>
+              <button
+                ref={undoButtonRef}
+                type="button"
+                onClick={undoDelete}
+                aria-label={`Undo delete of "${undoable.title}"`}
+                className="rounded-full bg-zinc-900 px-3 py-1 font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              >
+                Undo
+              </button>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
 }
+
+const UNDO_TIMEOUT_MS = 10_000;
 
 const STATUS_FILTER_OPTIONS: readonly {
   value: TaskStatusFilter;
