@@ -19,3 +19,5 @@ Conventions for anyone (human or AI) changing this repository.
   deterministic: pass `id` and `now` into `createTask` instead of relying on
   randomness or the clock.
 - Do not add dependencies for things that are a few lines of code.
+
+- The production build is a static export (`output: "export"` in next.config.ts) deployed to GitHub Pages; keep the app fully client-side.
