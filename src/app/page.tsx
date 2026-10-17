@@ -16,6 +16,7 @@ import {
   deleteTask,
   dueDateLabel,
   isOverdue,
+  overdueCount,
   renameTask,
   retreatTask,
   setDueDate,
@@ -38,6 +39,7 @@ export default function Home() {
   const [newDueDate, setNewDueDate] = useState("");
 
   const counts = taskCounts(tasks);
+  const overdue = overdueCount(tasks);
 
   const addTask = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -77,8 +79,17 @@ export default function Home() {
             A small task board. Add a task, move it across the columns, and it is
             kept in your browser.
           </p>
-          <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+          <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-zinc-500 dark:text-zinc-400">
             {taskSummary(tasks)}
+            {overdue > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                <span
+                  aria-hidden
+                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+                />
+                {overdue} overdue
+              </span>
+            )}
           </p>
         </header>
 

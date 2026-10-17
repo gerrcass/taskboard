@@ -10,6 +10,7 @@ import {
   dueDateLabel,
   isOverdue,
   moveTask,
+  overdueCount,
   renameTask,
   retreatTask,
   setDueDate,
@@ -122,6 +123,38 @@ describe("isOverdue", () => {
     expect(
       isOverdue({ ...task("a", "done"), dueDate: "2026-10-16" }, now),
     ).toBe(false);
+  });
+});
+
+describe("overdueCount", () => {
+  // Fixed local time: Saturday 17 October 2026.
+  const now = new Date(2026, 9, 17, 12).getTime();
+
+  it("is zero when nothing is overdue", () => {
+    const tasks = [
+      { ...task("a"), dueDate: "2026-10-17" },
+      { ...task("b"), dueDate: "2026-10-24" },
+      task("c"),
+    ];
+    expect(overdueCount(tasks, now)).toBe(0);
+  });
+
+  it("counts only the tasks whose due day has passed", () => {
+    const tasks = [
+      { ...task("a"), dueDate: "2026-10-16" },
+      { ...task("b"), dueDate: "2026-10-10" },
+      { ...task("c"), dueDate: "2026-10-24" },
+      { ...task("d") },
+    ];
+    expect(overdueCount(tasks, now)).toBe(2);
+  });
+
+  it("does not count a done task even after its due date", () => {
+    const tasks = [
+      { ...task("a", "done"), dueDate: "2026-10-16" },
+      { ...task("b"), dueDate: "2026-10-16" },
+    ];
+    expect(overdueCount(tasks, now)).toBe(1);
   });
 });
 

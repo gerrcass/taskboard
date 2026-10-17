@@ -167,6 +167,17 @@ export function isOverdue(task: Task, now: number = Date.now()): boolean {
   return task.dueDate < isoDay(now);
 }
 
+export function overdueCount(
+  tasks: readonly Task[],
+  now: number = Date.now(),
+): number {
+  let count = 0;
+  for (const task of tasks) {
+    if (isOverdue(task, now)) count += 1;
+  }
+  return count;
+}
+
 export function dueDateLabel(dueDate: string): string {
   const [, month, day] = dueDate.split("-").map(Number);
   return `Due ${MONTHS[month - 1]} ${day}`;
