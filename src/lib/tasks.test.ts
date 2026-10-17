@@ -5,6 +5,7 @@ import {
   createTask,
   deleteTask,
   moveTask,
+  renameTask,
   retreatTask,
   taskCounts,
   taskSummary,
@@ -69,6 +70,27 @@ describe("retreatTask", () => {
     tasks = retreatTask(tasks, "a");
     expect(tasks[0].status).toBe("todo");
     expect(retreatTask(tasks, "a")).toBe(tasks);
+  });
+});
+
+describe("renameTask", () => {
+  it("renames only the named task and trims the title", () => {
+    const tasks = [task("a"), task("b")];
+    const renamed = renameTask(tasks, "a", "  New title  ");
+    expect(renamed[0].title).toBe("New title");
+    expect(renamed[1].title).toBe("Task b");
+  });
+
+  it("keeps the old title when the new one is blank", () => {
+    const tasks = [task("a")];
+    expect(renameTask(tasks, "a", "   ")).toBe(tasks);
+    expect(renameTask(tasks, "a", "")).toBe(tasks);
+  });
+
+  it("returns the same array when nothing changes", () => {
+    const tasks = [task("a")];
+    expect(renameTask(tasks, "a", "Task a")).toBe(tasks);
+    expect(renameTask(tasks, "missing", "New title")).toBe(tasks);
   });
 });
 
